@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SZM Scorecard Portal | Shadowfax Last Mile</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0f172a;
+      --navy2: #1e293b;
+      --navy3: #334155;
+      --accent: #3b82f6;
+      --accent2: #60a5fa;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --cyan: #06b6d4;
+      --teal: #10b981;
+      --orange: #f97316;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #1e293b;
+      --text2: #64748b;
+      --border: #e2e8f0;
+      --sidebar-w: 280px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--navy);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid var(--navy3);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .brand-name {
+      color: #fff;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.3px;
+    }
+
+    .brand-sub {
+      color: var(--accent2);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .sidebar-date {
+      color: #94a3b8;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .szm-list-label {
+      padding: 16px 20px 8px;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .szm-list { padding: 0 12px 12px; }
+
+    .szm-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 2px;
+    }
+
+    .szm-item:hover { background: var(--navy3); }
+    .szm-item.active { background: rgba(59,130,246,0.2); }
+    .szm-item.active .szm-item-name { color: var(--accent2); }
+
+    .szm-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .szm-item-info { flex: 1; min-width: 0; }
+    .szm-item-name {
+      color: #e2e8f0;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .szm-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .szm-item-hubs { color: #94a3b8; font-size: 11px; }
+    .szm-item-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 20px;
+    }
+
+    .szm-rank-pill {
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 600;
+      min-width: 20px;
+      text-align: right;
+    }
+
+    /* ── MAIN CONTENT ── */
+    #main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+      min-width: 0;
+    }
+
+    /* Loading */
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 60vh;
+      gap: 16px;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: var(--text2); font-size: 14px; }
+
+    /* Dashboard */
+    #dashboard { display: none; }
+
+    /* Header */
+    .dash-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .dash-title h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .dash-title p { color: var(--text2); font-size: 13px; }
+
+    .dash-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .meta-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text2);
+    }
+    .meta-pill .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+
+    /* Score Banner */
+    .score-banner {
+      background: linear-gradient(135deg, #0f172a, #1e3a5f);
+      border-radius: 16px;
+      padding: 24px 28px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      position: relative;
+      overflow: hidden;
+    }
+    .score-banner::before {
+      content: '';
+      position: absolute;
+      right: -60px; top: -60px;
+      width: 220px; height: 220px;
+      background: radial-gradient(circle, rgba(59,130,246,0.15), transparent 70%);
+      pointer-events: none;
+    }
+
+    .score-ring-wrap { position: relative; flex-shrink: 0; }
+    .score-ring-wrap svg { display: block; }
+    .score-ring-label {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .score-ring-label .val {
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1;
+    }
+    .score-ring-label .lbl {
+      font-size: 10px;
+      color: #94a3b8;
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    .score-info { flex: 1; min-width: 200px; }
+    .score-info .szm-fullname {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .score-info .szm-email {
+      color: #94a3b8;
+      font-size: 12px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .kpi {
+      display: flex;
+      flex-direction: column;
+    }
+    .kpi .kval {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+    }
+    .kpi .klbl {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 3px;
+    }
+
+    .rank-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 16px 20px;
+      min-width: 90px;
+    }
+    .rank-badge .rank-num {
+      font-size: 32px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1;
+    }
+    .rank-badge .rank-lbl {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-top: 4px;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    /* Section heading */
+    .section-heading {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-heading::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Metric Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .metric-card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+
+    .metric-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .metric-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metric-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+
+    .metric-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .metric-desc {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+
+    .metric-weight {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      background: #f1f5f9;
+      color: var(--text2);
+      flex-shrink: 0;
+    }
+
+    .metric-score-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .metric-score {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .metric-pending {
+      text-align: right;
+    }
+    .metric-pending .pval {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .metric-pending .plbl {
+      font-size: 10px;
+      color: var(--text2);
+      font-weight: 500;
+    }
+
+    .progress-bar-bg {
+      height: 6px;
+      background: #f1f5f9;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.6s ease;
+    }
+
+    .metric-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+    }
+    .status-text {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Hub Table */
+    .hubs-section {
+      background: var(--card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+
+    .hubs-table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hubs-table-header h3 { font-size: 15px; font-weight: 700; }
+    .hubs-count {
+      background: #f1f5f9;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text2);
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead tr {
+      background: #f8fafc;
+    }
+
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { background: #f1f5f9; }
+    th .sort-icon { color: #cbd5e1; margin-left: 4px; }
+    th.sorted-asc .sort-icon::after { content: ' ↑'; color: var(--accent); }
+    th.sorted-desc .sort-icon::after { content: ' ↓'; color: var(--accent); }
+
+    td {
+      padding: 11px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    .hub-name-cell {
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .score-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 6px;
+      min-width: 52px;
+    }
+
+    .mini-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+    }
+    .mini-bar-bg {
+      flex: 1;
+      height: 5px;
+      background: #f1f5f9;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .mini-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+    }
+    .mini-bar-label {
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    .pend-chip {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 5px;
+      background: #f8fafc;
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .pend-chip.red { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+    .pend-chip.yellow { background: #fffbeb; color: #d97706; border-color: #fde68a; }
+
+    .rank-cell {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--text2);
+    }
+    .rank-cell.top { color: #f59e0b; }
+
+    /* Score colors */
+    .score-green  { color: #16a34a; }
+    .score-yellow { color: #d97706; }
+    .score-red    { color: #dc2626; }
+    .score-green-chip  { background: #dcfce7; color: #16a34a; }
+    .score-yellow-chip { background: #fef9c3; color: #b45309; }
+    .score-red-chip    { background: #fee2e2; color: #dc2626; }
+
+    .bar-green  { background: #22c55e; }
+    .bar-yellow { background: #f59e0b; }
+    .bar-red    { background: #ef4444; }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 16px;
+      padding: 12px 22px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text2);
+      font-weight: 500;
+    }
+    .legend-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text2);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .empty-state p { font-size: 13px; }
+
+    /* Tooltip */
+    [data-tooltip] { position: relative; cursor: help; }
+    [data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 100;
+      margin-bottom: 6px;
+    }
+    [data-tooltip]:hover::after { opacity: 1; }
+
+    .refresh-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #e2e8f0;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .refresh-btn:hover { background: rgba(255,255,255,0.15); }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      #sidebar { width: 100%; min-width: unset; height: auto; position: static; }
+      .szm-list { display: flex; flex-wrap: wrap; }
+      .szm-item { flex: 1; min-width: 200px; }
+      #main { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <div class="brand">
+      <div class="brand-icon">🚚</div>
+      <div>
+        <div class="brand-name">Shadowfax</div>
+        <div class="brand-sub">Last Mile Intelligence</div>
+      </div>
+    </div>
+    <div class="sidebar-date" id="sidebar-date">Loading...</div>
+  </div>
+
+  <div class="szm-list-label">SZMs — Ranked by Score</div>
+  <div class="szm-list" id="szm-list"></div>
+</aside>
+
+<!-- MAIN -->
+<main id="main">
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>Fetching scorecard data…</p>
+  </div>
+
+  <div id="dashboard">
+    <!-- Header -->
+    <div class="dash-header">
+      <div class="dash-title">
+        <h1 id="dash-title-name">SZM Scorecard</h1>
+        <p id="dash-title-sub">Hub performance overview • Last Mile</p>
+      </div>
+      <div class="dash-meta">
+        <div class="meta-pill">
+          <span class="dot" style="background:#22c55e"></span>
+          <span id="meta-status">Live</span>
+        </div>
+        <div class="meta-pill" id="meta-time"></div>
+      </div>
+    </div>
+
+    <!-- Score Banner -->
+    <div class="score-banner">
+      <div class="score-ring-wrap">
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10"/>
+          <circle id="score-ring-circle" cx="55" cy="55" r="46" fill="none"
+            stroke="#3b82f6" stroke-width="10" stroke-linecap="round"
+            stroke-dasharray="289" stroke-dashoffset="289"
+            transform="rotate(-90 55 55)"
+            style="transition: stroke-dashoffset 1s ease, stroke 0.4s"/>
+        </svg>
+        <div class="score-ring-label">
+          <span class="val" id="banner-score">0</span>
+          <span class="lbl">/ 100</span>
+        </div>
+      </div>
+
+      <div class="score-info">
+        <div class="szm-fullname" id="banner-name">—</div>
+        <div class="szm-email" id="banner-email">—</div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <span class="kval" id="kpi-hubs">—</span>
+            <span class="klbl">Hubs Managed</span>
+          </div>
+          <div class="kpi">
+            <span class="kval" id="kpi-best">—</span>
+            <span class="klbl">Best Hub Score</span>
+          </div>
+          <div class="kpi">
+            <span class="kval" id="kpi-worst">—</span>
+            <span class="klbl">Worst Hub Score</span>
+          </div>
+          <div class="kpi">
+            <span class="kval" id="kpi-totalPend">—</span>
+            <span class="klbl">Total Pending</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rank-badge">
+        <div class="rank-num" id="banner-rank">#—</div>
+        <div class="rank-lbl">SZM<br>Rank</div>
+      </div>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="section-heading">Metric Breakdown</div>
+    <div class="metrics-grid" id="metrics-grid"></div>
+
+    <!-- Hub Table -->
+    <div class="section-heading">Hub Performance</div>
+    <div class="hubs-section">
+      <div class="hubs-table-header">
+        <h3>All Hubs</h3>
+        <div class="hubs-count" id="hubs-count">— hubs</div>
+      </div>
+      <div class="table-wrap">
+        <table id="hubs-table">
+          <thead>
+            <tr>
+              <th onclick="sortTable('hub')" data-col="hub">Hub <span class="sort-icon"></span></th>
+              <th onclick="sortTable('score')" data-col="score">Overall Score <span class="sort-icon"></span></th>
+              <th onclick="sortTable('clearance')" data-col="clearance">Clearance <span class="sort-icon" data-tooltip="Hub Clearance (25%)"></span></th>
+              <th onclick="sortTable('issue')" data-col="issue">Issue Raised <span class="sort-icon" data-tooltip="Issue Raised (20%)"></span></th>
+              <th onclick="sortTable('fasr')" data-col="fasr">FASR/FPSR <span class="sort-icon" data-tooltip="FASR & FPSR (20%)"></span></th>
+              <th onclick="sortTable('d2za')" data-col="d2za">D2+ ZA <span class="sort-icon" data-tooltip="D2+ ZA (15%)"></span></th>
+              <th onclick="sortTable('tally')" data-col="tally">Tally <span class="sort-icon" data-tooltip="Shipment Tally (10%)"></span></th>
+              <th onclick="sortTable('bagging')" data-col="bagging">Bagging <span class="sort-icon" data-tooltip="Bagging Pendency (10%)"></span></th>
+              <th onclick="sortTable('hubRank')" data-col="hubRank">Rank <span class="sort-icon"></span></th>
+            </tr>
+          </thead>
+          <tbody id="hubs-tbody"></tbody>
+        </table>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span> ≥ 80 Good</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span> 60–79 Average</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> &lt; 60 Needs Attention</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════
+const SHEET_URL = '/api/data';
+
+const METRICS = [
+  { key: 'clearance', label: 'Hub Clearance',           scoreIdx: 5,  pendIdx: 6,  weight: 25, color: '#3b82f6', bg:'#eff6ff', icon: '🚚', desc: 'Attempted ÷ Eligible for attempt' },
+  { key: 'issue',     label: 'Issue Raised Shipments',  scoreIdx: 3,  pendIdx: 4,  weight: 20, color: '#ef4444', bg:'#fef2f2', icon: '⚠️', desc: 'UDS & customer-escalated shipments' },
+  { key: 'fasr',      label: 'FASR & FPSR',             scoreIdx: 9,  pendIdx: 10, weight: 20, color: '#8b5cf6', bg:'#f5f3ff', icon: '🎯', desc: 'First attempt delivery / pickup rate' },
+  { key: 'd2za',      label: 'D2+ ZA Pendency',         scoreIdx: 7,  pendIdx: 8,  weight: 15, color: '#f59e0b', bg:'#fffbeb', icon: '📦', desc: 'Non-attempted shipments post day 2' },
+  { key: 'bagging',   label: 'Bagging & Connection',    scoreIdx: 13, pendIdx: 14, weight: 10, color: '#10b981', bg:'#ecfdf5', icon: '🔗', desc: 'Undelivered/picked not connected back' },
+  { key: 'tally',     label: 'Shipment Tally',          scoreIdx: 11, pendIdx: 12, weight: 10, color: '#06b6d4', bg:'#ecfeff', icon: '📋', desc: 'Inventory reconciliation scan rate' },
+];
+
+// Column order: [szm_email(0), hub_name(1), hub_score(2), issue_score(3), issue_pend(4),
+//  clearance_score(5), clearance_pend(6), d2za_score(7), d2za_pend(8),
+//  fasr_score(9), fasr_pend(10), tally_score(11), tally_pend(12),
+//  bagging_score(13), bagging_pend(14), hub_rank(15), pod_name(16)]
+
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let allData = [];
+let szmMap  = {};
+let szmRanks = {};
+let currentSZM = null;
+let sortCol = 'score';
+let sortAsc = false;
+
+// ═══════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════
+function scoreClass(v) {
+  if (v >= 80) return 'score-green';
+  if (v >= 60) return 'score-yellow';
+  return 'score-red';
+}
+function chipClass(v) {
+  if (v >= 80) return 'score-green-chip';
+  if (v >= 60) return 'score-yellow-chip';
+  return 'score-red-chip';
+}
+function barClass(v) {
+  if (v >= 80) return 'bar-green';
+  if (v >= 60) return 'bar-yellow';
+  return 'bar-red';
+}
+function statusLabel(v) {
+  if (v >= 80) return { text: 'Good', color: '#16a34a', dot: '#22c55e' };
+  if (v >= 60) return { text: 'Average', color: '#d97706', dot: '#f59e0b' };
+  return { text: 'Needs Attention', color: '#dc2626', dot: '#ef4444' };
+}
+function ringColor(v) {
+  if (v >= 80) return '#22c55e';
+  if (v >= 60) return '#f59e0b';
+  return '#ef4444';
+}
+function fmt(v) { return (parseFloat(v)||0).toFixed(1); }
+function nameFromEmail(email) {
+  const local = email.split('@')[0];
+  return local.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+function avatarColors(i) {
+  const palette = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#f97316','#6366f1','#ec4899'];
+  return palette[i % palette.length];
+}
+function initials(name) {
+  return name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+}
+
+// ═══════════════════════════════════════════════════
+// PARSE CSV
+// ═══════════════════════════════════════════════════
+function parseCSV(csv) {
+  const lines = csv.trim().split('\n');
+  const headers = lines[0].replace(/\r/g,'').split(',');
+  return lines.slice(1).map(line => {
+    const vals = line.replace(/\r/g,'').split(',');
+    const o = {};
+    headers.forEach((h,i) => o[h.trim()] = (vals[i]||'').trim());
+    return o;
+  });
+}
+
+function rowToArray(r) {
+  return [
+    r.system_szm_email,
+    r.hub_name,
+    parseFloat(r.Hub_Score_Live)||0,
+    parseFloat(r.Issue_Raised_Shipments_Score_out_of_100)||0,
+    parseInt(r.Issue_Raised_Pending_Shipments_Count)||0,
+    parseFloat(r.Clearance_Score_out_of_100)||0,
+    parseInt(r.Clearance_Pending_Shipments_Count)||0,
+    parseFloat(r.D2ZA_Score_out_of_100)||0,
+    parseInt(r.D2ZA_Pending_Shipments_Count)||0,
+    parseFloat(r.FASR_Score_out_of_100)||0,
+    parseInt(r.FASR_Pending_Shipments_Count)||0,
+    parseFloat(r.Tally_Score_out_of_100)||0,
+    parseInt(r.Tally_Pending_Shipments_Count)||0,
+    parseFloat(r.Bagging_Pendency_Score_out_of_100)||0,
+    parseInt(r.Bagging_Pending_Shipments_Count)||0,
+    parseInt(r['szm_wise_day_rank'])||0,
+    r.system_pod_name,
+    r.ist_last_calculated_at,
+    r.score_date,
+  ];
+}
+
+// ═══════════════════════════════════════════════════
+// BUILD SZM MAP
+// ═══════════════════════════════════════════════════
+function buildSZMMap(rows) {
+  const map = {};
+  rows.forEach(r => {
+    const szm = r[0];
+    if (!map[szm]) map[szm] = [];
+    map[szm].push(r);
+  });
+  return map;
+}
+
+function computeSZMRanks(map) {
+  const szms = Object.keys(map);
+  const scored = szms.map(szm => {
+    const hubs = map[szm];
+    const avg = hubs.reduce((s,h) => s + h[2], 0) / hubs.length;
+    return { szm, avg };
+  }).sort((a,b) => b.avg - a.avg);
+  const ranks = {};
+  scored.forEach((s,i) => ranks[s.szm] = i + 1);
+  return ranks;
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER SIDEBAR
+// ═══════════════════════════════════════════════════
+function renderSidebar() {
+  const szms = Object.keys(szmMap);
+  const ranked = szms.map(szm => {
+    const hubs = szmMap[szm];
+    const avg = hubs.reduce((s,h) => s + h[2], 0) / hubs.length;
+    return { szm, avg, hubs: hubs.length };
+  }).sort((a,b) => b.avg - a.avg);
+
+  const list = document.getElementById('szm-list');
+  list.innerHTML = '';
+
+  ranked.forEach((item, i) => {
+    const name = nameFromEmail(item.szm);
+    const color = avatarColors(i);
+    const sc = item.avg;
+    const bgColor = sc >= 80 ? '#dcfce7' : sc >= 60 ? '#fef9c3' : '#fee2e2';
+    const textColor = sc >= 80 ? '#16a34a' : sc >= 60 ? '#b45309' : '#dc2626';
+
+    const div = document.createElement('div');
+    div.className = 'szm-item' + (item.szm === currentSZM ? ' active' : '');
+    div.dataset.szm = item.szm;
+    div.innerHTML = `
+      <div class="szm-avatar" style="background:${color}">${initials(name)}</div>
+      <div class="szm-item-info">
+        <div class="szm-item-name">${name}</div>
+        <div class="szm-item-meta">
+          <span class="szm-item-hubs">${item.hubs} hubs</span>
+          <span class="szm-item-badge" style="background:${bgColor};color:${textColor}">${sc.toFixed(1)}</span>
+        </div>
+      </div>
+      <div class="szm-rank-pill">#${i+1}</div>
+    `;
+    div.addEventListener('click', () => selectSZM(item.szm));
+    list.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// SELECT SZM
+// ═══════════════════════════════════════════════════
+function selectSZM(szm) {
+  currentSZM = szm;
+
+  // update sidebar active
+  document.querySelectorAll('.szm-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.szm === szm);
+  });
+
+  renderDashboard(szm);
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER DASHBOARD
+// ═══════════════════════════════════════════════════
+function renderDashboard(szm) {
+  const hubs = szmMap[szm];
+  const name = nameFromEmail(szm);
+  const rank = szmRanks[szm];
+  const totalSZMs = Object.keys(szmMap).length;
+
+  // Aggregate
+  const avgScore = hubs.reduce((s,h) => s + h[2], 0) / hubs.length;
+  const bestScore = Math.max(...hubs.map(h => h[2]));
+  const worstScore = Math.min(...hubs.map(h => h[2]));
+
+  const metricAvgs = METRICS.map(m => ({
+    ...m,
+    avgScore: hubs.reduce((s,h) => s + h[m.scoreIdx], 0) / hubs.length,
+    totalPend: hubs.reduce((s,h) => s + h[m.pendIdx], 0),
+  }));
+  const totalPending = metricAvgs.reduce((s,m) => s + m.totalPend, 0);
+
+  const lastCalc = hubs[0]?.[17] || '';
+  const scoreDate = hubs[0]?.[18] || '';
+
+  // Header
+  document.getElementById('dash-title-name').textContent = name + "\u2019s Scorecard";
+  document.getElementById('dash-title-sub').textContent = `${hubs.length} hubs • ${hubs[0]?.[16] || ''} • Score Date: ${scoreDate}`;
+  document.getElementById('meta-time').textContent = lastCalc ? 'Updated: ' + lastCalc.split(' ')[1] : '';
+
+  // Banner
+  document.getElementById('banner-name').textContent = name;
+  document.getElementById('banner-email').textContent = szm;
+  document.getElementById('banner-score').textContent = avgScore.toFixed(1);
+  document.getElementById('kpi-hubs').textContent = hubs.length;
+  document.getElementById('kpi-best').textContent = bestScore.toFixed(1);
+  document.getElementById('kpi-worst').textContent = worstScore.toFixed(1);
+  document.getElementById('kpi-totalPend').textContent = totalPending.toLocaleString();
+  document.getElementById('banner-rank').textContent = '#' + rank;
+
+  // Ring
+  const circ = document.getElementById('score-ring-circle');
+  const pct = avgScore / 100;
+  const dashes = 289;
+  circ.style.strokeDashoffset = (dashes * (1 - pct)).toFixed(2);
+  circ.style.stroke = ringColor(avgScore);
+
+  // Metrics
+  const grid = document.getElementById('metrics-grid');
+  grid.innerHTML = '';
+  metricAvgs.forEach(m => {
+    const sc = m.avgScore;
+    const st = statusLabel(sc);
+    const card = document.createElement('div');
+    card.className = 'metric-card';
+    card.innerHTML = `
+      <div class="metric-top">
+        <div class="metric-title-row">
+          <div class="metric-icon" style="background:${m.bg}">${m.icon}</div>
+          <div>
+            <div class="metric-name">${m.label}</div>
+            <div class="metric-desc">${m.desc}</div>
+          </div>
+        </div>
+        <div class="metric-weight" data-tooltip="Scorecard weightage">${m.weight}%</div>
+      </div>
+      <div class="metric-score-row">
+        <div class="metric-score ${scoreClass(sc)}" style="color:${m.color}">${sc.toFixed(1)}</div>
+        <div class="metric-pending">
+          <div class="pval">${m.totalPend.toLocaleString()}</div>
+          <div class="plbl">Total Pending</div>
+        </div>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill ${barClass(sc)}" style="width:${sc}%;background:${sc >= 80 ? '#22c55e' : sc >= 60 ? '#f59e0b' : '#ef4444'}"></div>
+      </div>
+      <div class="metric-status">
+        <span class="status-dot" style="background:${st.dot}"></span>
+        <span class="status-text" style="color:${st.color}">${st.text}</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:auto">Contribution: ${(sc * m.weight / 100).toFixed(1)} pts</span>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Table
+  document.getElementById('hubs-count').textContent = hubs.length + ' hubs';
+  renderTable(hubs);
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER HUB TABLE
+// ═══════════════════════════════════════════════════
+let currentHubs = [];
+
+function renderTable(hubs) {
+  currentHubs = [...hubs];
+  sortTableData();
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = col === 'hub'; }
+
+  document.querySelectorAll('th[data-col]').forEach(th => {
+    th.classList.remove('sorted-asc','sorted-desc');
+  });
+  const th = document.querySelector(`th[data-col="${col}"]`);
+  if (th) th.classList.add(sortAsc ? 'sorted-asc' : 'sorted-desc');
+
+  sortTableData();
+}
+
+const colMap = { hub:1, score:2, clearance:5, issue:3, fasr:9, d2za:7, tally:11, bagging:13, hubRank:15 };
+
+function sortTableData() {
+  const idx = colMap[sortCol] ?? 2;
+  currentHubs.sort((a,b) => {
+    let va = a[idx], vb = b[idx];
+    if (sortCol === 'hub') va = String(va), vb = String(vb);
+    if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortAsc ? va - vb : vb - va;
+  });
+  drawTable(currentHubs);
+}
+
+function drawTable(hubs) {
+  const tbody = document.getElementById('hubs-tbody');
+  tbody.innerHTML = '';
+
+  hubs.forEach(h => {
+    const overallSc = h[2];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="hub-name-cell">${h[1]}</td>
+      <td>
+        <div class="mini-bar-wrap">
+          <div class="mini-bar-bg"><div class="mini-bar-fill ${barClass(overallSc)}" style="width:${overallSc}%;background:${overallSc >= 80 ? '#22c55e' : overallSc >= 60 ? '#f59e0b' : '#ef4444'}"></div></div>
+          <span class="mini-bar-label ${scoreClass(overallSc)}">${overallSc.toFixed(1)}</span>
+        </div>
+      </td>
+      ${metricCell(h[5], h[6])}
+      ${metricCell(h[3], h[4])}
+      ${metricCell(h[9], h[10])}
+      ${metricCell(h[7], h[8])}
+      ${metricCell(h[11], h[12])}
+      ${metricCell(h[13], h[14])}
+      <td class="rank-cell ${h[15] <= 3 ? 'top' : ''}">${h[15] ? '#' + h[15] : '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function metricCell(score, pend) {
+  const pendClass = pend > 100 ? 'red' : pend > 20 ? 'yellow' : '';
+  return `<td>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span class="score-chip ${chipClass(score)}">${score.toFixed(0)}</span>
+      ${pend > 0 ? `<span class="pend-chip ${pendClass}">${pend.toLocaleString()} pend</span>` : ''}
+    </div>
+  </td>`;
+}
+
+// ═══════════════════════════════════════════════════
+// LOAD DATA
+// ═══════════════════════════════════════════════════
+async function loadData() {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const resp = await fetch(SHEET_URL, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const csv = await resp.text();
+    const parsed = parseCSV(csv);
+    allData = parsed.map(rowToArray);
+  } catch(e) {
+    console.warn('Fetch failed, using embedded data:', e.message);
+    allData = EMBEDDED_DATA;
+  }
+
+  szmMap   = buildSZMMap(allData);
+  szmRanks = computeSZMRanks(szmMap);
+
+  const scoreDate = allData[0]?.[18] || 'Today';
+  document.getElementById('sidebar-date').textContent = 'Score Date: ' + scoreDate;
+
+  renderSidebar();
+
+  // Auto-select first (highest-ranked) SZM
+  const ranked = Object.entries(szmRanks).sort((a,b) => a[1] - b[1]);
+  if (ranked.length > 0) selectSZM(ranked[0][0]);
+}
+
+// ═══════════════════════════════════════════════════
+// EMBEDDED FALLBACK DATA
+// (auto-generated from Google Sheet export)
+// ═══════════════════════════════════════════════════
+const EMBEDDED_DATA = [
+["chandrashekhara.sb@shadowfax.in","BLR_DevanahalliMD_SCC",16.86,90.6,11,0,829,0,30,0,197,0,452,0,100,9,"POD_BLR","3/11/2026 10:38:52","3/11/2026"],
+["chandrashekhara.sb@shadowfax.in","BLR_Byadarahalli",17,91.4,4,0,2362,0,489,0,546,0,270,0,61,8,"POD_BLR","3/11/2026 10:37:22","3/11/2026"],
+["chandrashekhara.sb@shadowfax.in","NMGA_Sompura_SCC",33.13,99,1,0,377,92.3,3,0,303,0,230,40,59,7,"POD_BLR","3/11/2026 10:39:49","3/11/2026"],
+["chandrashekhara.sb@shadowfax.in","BLR_Banavara",35.93,100,0,31.2,539,33.3,137,0,646,0,402,58.2,8,6,"POD_BLR","3/11/2026 10:37:29","3/11/2026"],
+["chandrashekhara.sb@shadowfax.in","BLR_HarshaLayout",39.62,75.2,2,20,588,100,0,0,517,0,184,75.6,8,5,"POD_BLR","3/11/2026 10:38:42","3/11/2026"],
+["chandrashekhara.sb@shadowfax.in","BLR_Nagasandra",40.35,77.6,2,15.8,1237,75.9,33,0,1187,20,260,75,10,4,"POD_BLR","3/11/2026 10:39:47","3/11/2026"],
+["chandrashekhara.sb@shadowfax.in","BLR_Whitefield",42.75,35.2,18,64.5,317,93.9,4,0,793,0,199,55,18,3,"POD_BLR","3/11/2026 10:39:46","3/11/2026"],
+["chandrashekhara.sb@shadowfax.in","BLR_VarthurRoad",45.44,93,6,46.6,315,68.3,28,0,688,0,28,83.8,6,2,"POD_BLR","3/11/2026 10:38:42","3/11/2026"],
+["chandrashekhara.sb@shadowfax.in","BLR_KumbalgoduSCC",70.4,100,0,100,4,100,0,0,456,0,0,100,1,1,"POD_BLR","3/11/2026 10:37:51","3/11/2026"],
+["hemachandar.k@shadowfax.in","BLR_HAL",20.49,51.7,6,0,1208,30,67,0,453,0,625,71.9,4,4,"POD_BLR","3/11/2026 10:38:50","3/11/2026"],
+["hemachandar.k@shadowfax.in","BLR_Domlur",20.65,91,2,0,1730,0,290,0,115,0,112,20,22,3,"POD_BLR","3/11/2026 10:38:41","3/11/2026"],
+["hemachandar.k@shadowfax.in","BLR_WilsonGarden",25.65,52.5,4,0,1158,82.6,13,0,390,0,538,46.9,10,2,"POD_BLR","3/11/2026 10:39:11","3/11/2026"],
+["hemachandar.k@shadowfax.in","BLR_Kagadaspur",47.36,100,0,20,651,90.9,8,0,404,22.8,5,100,0,1,"POD_BLR","3/11/2026 10:39:32","3/11/2026"],
+["keshava.c@shadowfax.in","BLR_KRmarket",13.99,32.7,7,0,970,30,85,0,67,20,650,20,49,7,"POD_BLR","3/11/2026 10:36:33","3/11/2026"],
+["keshava.c@shadowfax.in","BLR_Chamrajpet",20,87.5,6,0,1700,13.3,153,0,244,0,1107,20,54,6,"POD_BLR","3/11/2026 10:36:31","3/11/2026"],
+["keshava.c@shadowfax.in","BLR_Deepanjalinagar",24.6,100,0,0,3257,0,317,0,581,0,725,79.5,3,5,"POD_BLR","3/11/2026 10:39:50","3/11/2026"],
+["keshava.c@shadowfax.in","BLR_MagadiThavarekere",30.27,100,0,0,1046,16,133,0,235,20,59,100,0,4,"POD_BLR","3/11/2026 10:39:51","3/11/2026"],
+["keshava.c@shadowfax.in","BLR_Ullal",46.42,100,0,26,112,100,0,0,441,20,43,92.5,1,3,"POD_BLR","3/11/2026 10:39:16","3/11/2026"],
+["keshava.c@shadowfax.in","BLR_Magadiroad",49.37,79.2,1,62.8,318,88.1,1,0,776,17.1,19,66.2,28,2,"POD_BLR","3/11/2026 10:38:42","3/11/2026"],
+["keshava.c@shadowfax.in","BLR_Nagarbhavi",52.26,98.4,1,54.2,111,96.9,2,0,395,0,263,84.4,4,1,"POD_BLR","3/11/2026 10:39:51","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_Horamavu",11.54,46.2,15,0,2126,0,279,0,366,0,1861,23,38,9,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_Ramamurthynagar",23.61,36,16,18.6,1403,28.3,82,0,618,1036,75,0,5,"POD_BLR","3/11/2026 10:39:52","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_Kadugodi",27.66,88.1,4,0,2819,53.6,73,0,567,0,733,20,40,4,"POD_BLR","3/11/2026 10:39:47","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_Anadapura",27.86,46.3,4,3.4,327,82.8,11,0,261,0,123,74.4,6,3,"POD_BLR","3/11/2026 10:39:51","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_Lingarajapuram",31.03,100,0,0,1184,0,47,40,122,13.7,32,40,34,6,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_Avalahalli",31.49,98.3,1,8.6,350,13.1,44,0,414,20,103,100,0,7,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_Kothanur",32.1,92,1,0,765,75.7,94,0,422,9.6,23,38.1,18,8,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_KRPuram",56.09,98.9,1,55.5,297,97.6,2,0,603,0,135,100,0,2,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["kiran.j@shadowfax.in","BLR_Kundalahalli",60.61,71.3,8,100,229,82.3,12,0,1450,0,107,90,4,1,"POD_BLR","3/11/2026 10:39:47","3/11/2026"],
+["madesh.n@shadowfax.in","BLR_Jigani",29.82,72.6,2,20,665,48,50,0,470,0,436,71.7,12,8,"POD_BLR","3/11/2026 10:36:33","3/11/2026"],
+["madesh.n@shadowfax.in","BLR_Harohalli",30.56,82.4,1,0,139,65,7,0,251,0,101,85,3,7,"POD_BLR","3/11/2026 10:36:31","3/11/2026"],
+["madesh.n@shadowfax.in","BLR_Bannerghatta",30.95,59.5,6,0.8,814,62.4,34,0,627,20,213,75,8,6,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["madesh.n@shadowfax.in","BLR_Bommasandra",51.94,100,0,77,127,84.1,8,0,930,0,326,40,12,5,"POD_BLR","3/11/2026 10:39:50","3/11/2026"],
+["madesh.n@shadowfax.in","BLR_JPNagar",68.2,91,1,100,116,100,0,0,1067,0,46,100,0,4,"POD_BLR","3/11/2026 10:38:42","3/11/2026"],
+["madesh.n@shadowfax.in","BLR_Chandapura",69.69,97.1,1,100,88,96.4,2,0,785,0,55,62.5,5,3,"POD_BLR","3/11/2026 10:38:44","3/11/2026"],
+["madesh.n@shadowfax.in","BLR_Attibele",72.23,95.5,2,100,28,100,0,0,547,0,10,87.5,4,2,"POD_BLR","3/11/2026 10:36:54","3/11/2026"],
+["madesh.n@shadowfax.in","BLR_ElectronicCity",73.14,100,0,100,75,100,0,0,783,0,62,75,4,1,"POD_BLR","3/11/2026 10:39:52","3/11/2026"],
+["manikanthan.m@shadowfax.in","BLR_Sarjapur",12.5,24,9,0,839,0,210,0,252,0,618,31.2,10,7,"POD_BLR","3/11/2026 10:38:43","3/11/2026"],
+["manikanthan.m@shadowfax.in","BLR_Dommasandra",18.33,92.3,5,0,1098,0,379,0,166,0,749,20,65,6,"POD_BLR","3/11/2026 10:39:46","3/11/2026"],
+["manikanthan.m@shadowfax.in","BLR_Marathahalli",21.54,62.1,7,0,1291,0,340,0,255,0,1047,41.2,17,5,"POD_BLR","3/11/2026 10:39:47","3/11/2026"],
+["manikanthan.m@shadowfax.in","BLR_Ramagondanahalli",23.76,84,5,0,1095,25.6,45,0,295,0,748,65,11,4,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["manikanthan.m@shadowfax.in","BLR_Hoskote",27.79,97.5,5,0,1208,0,379,0,150,39.8,5,100,0,3,"POD_BLR","3/11/2026 10:37:54","3/11/2026"],
+["manikanthan.m@shadowfax.in","BLR_Kasavanahalli",55.6,96.8,2,83,41,29,5,0,735,31.6,14,80,1,2,"POD_BLR","3/11/2026 10:38:50","3/11/2026"],
+["manikanthan.m@shadowfax.in","BLR_Amblipura",64.87,51.4,4,100,44,94.3,3,0,534,60.6,5,93.8,3,1,"POD_BLR","3/11/2026 10:36:30","3/11/2026"],
+["prabhakaran.m@shadowfax.in","BLR_Yalahanka",15.34,64.2,7,0,2190,0,429,0,458,0,994,25,37,5,"POD_BLR","3/11/2026 10:39:49","3/11/2026"],
+["prabhakaran.m@shadowfax.in","BLR_KalyanNagar",17.66,87.1,3,0,1216,0,348,0,144,0,536,26.6,41,4,"POD_BLR","3/11/2026 10:39:15","3/11/2026"],
+["prabhakaran.m@shadowfax.in","BLR_Hebbal",19.14,72.6,9,0,1299,0,215,0,289,0,728,30,52,3,"POD_BLR","3/11/2026 10:38:43","3/11/2026"],
+["prabhakaran.m@shadowfax.in","BLR_Kodigehalli",22.77,74.8,4,0,1189,19.8,78,0,280,20,244,55,38,2,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["prabhakaran.m@shadowfax.in","BLR_Sahakarnagar",33.55,88.6,2,0,543,62.3,23,0,286,20,96,72.7,7,1,"POD_BLR","3/11/2026 10:39:46","3/11/2026"],
+["tirumalesh.br@shadowfax.in","BLR_Kengeri",25.69,81.3,4,0,1103,0,318,0,234,0,1013,73.5,11,8,"POD_BLR","3/11/2026 10:39:49","3/11/2026"],
+["tirumalesh.br@shadowfax.in","BLR_RajaRajeswari",35.72,90.9,4,0,604,65.9,25,0,498,20,136,89.3,2,7,"POD_BLR","3/11/2026 10:39:49","3/11/2026"],
+["tirumalesh.br@shadowfax.in","BLR_Vijayanagar",38.23,84.3,5,25.8,449,62.9,15,0,449,20,199,86.4,4,6,"POD_BLR","3/11/2026 10:39:14","3/11/2026"],
+["tirumalesh.br@shadowfax.in","BLR_Nagarabhavi",41.44,84.8,3,21.7,395,78.3,8,0,500,20,71,100,0,5,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["tirumalesh.br@shadowfax.in","BLR_Uttarahalli",43.48,93.8,2,38.4,286,79.1,10,0,450,0,125,87.5,2,4,"POD_BLR","3/11/2026 10:38:42","3/11/2026"],
+["tirumalesh.br@shadowfax.in","BLR_Mysoreroad",49.59,90.1,2,54.1,297,86.4,5,0,450,0,114,77.9,5,3,"POD_BLR","3/11/2026 10:39:16","3/11/2026"],
+["tirumalesh.br@shadowfax.in","BLR_RRNagar",55.27,97.5,2,70.6,182,79.5,9,0,478,0,56,83.3,3,2,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["tirumalesh.br@shadowfax.in","BLR_Girinagar",57.59,95.1,3,78.9,132,92.3,4,0,398,0,38,76.5,8,1,"POD_BLR","3/11/2026 10:38:40","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Hebbal2",18.73,55.6,8,0,1356,0,212,0,312,0,938,36.4,15,11,"POD_BLR","3/11/2026 10:38:42","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_IndiraNagar",21.39,58.3,7,0,1478,0,289,0,386,0,847,27.3,25,10,"POD_BLR","3/11/2026 10:39:47","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Shivajinagar",23.82,74.5,5,0,1189,23.6,68,0,334,0,612,44.4,18,9,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Frazer_Town",26.44,78.9,4,0,982,38.5,42,0,276,20,378,60,14,8,"POD_BLR","3/11/2026 10:36:33","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Malleswaram",29.37,85.4,3,0,756,49.3,28,0,298,20,252,57.1,10,7,"POD_BLR","3/11/2026 10:38:43","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Rajajinagar",32.88,89.7,2,14.6,534,68.3,16,0,389,20,186,73.3,8,6,"POD_BLR","3/11/2026 10:39:49","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Yeshwanthpur",36.45,92.3,2,28.4,398,74.6,12,0,312,0,248,66.7,9,5,"POD_BLR","3/11/2026 10:39:48","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Mathikere",42.18,94.6,1,42.8,289,83.5,8,0,345,0,148,78.9,5,4,"POD_BLR","3/11/2026 10:39:46","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Sanjaynagar",48.72,96.4,1,58.9,212,89.7,5,0,289,0,97,82.4,3,3,"POD_BLR","3/11/2026 10:39:51","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_BEL_Layout",53.96,97.8,1,70.3,165,92.4,3,0,268,0,72,85.7,2,2,"POD_BLR","3/11/2026 10:38:52","3/11/2026"],
+["vishwanath.sm@shadowfax.in","BLR_Sadashivanagar",61.44,99.1,1,88.4,98,95.6,2,0,213,0,34,88.2,2,1,"POD_BLR","3/11/2026 10:39:52","3/11/2026"]
+];
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+loadData();
+</script>
+</body>
+</html>
