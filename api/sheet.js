@@ -1,14 +1,10 @@
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 30, memory: 1024 };
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   const SHEET_ID = '1WV7v2CeS7RQHWCETpEF1SIVugrlrJf29XCYvcVvDZAI';
-
-  // Use Google Sheets gviz query to fetch only latest date's data
-  // This dramatically reduces rows from 123k to ~2k
-  const query = encodeURIComponent("select * where A=max(A)");
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&tq=${query}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 
   const METRIC_MAP = {
     'Clearance':'clearance','Hub Clearance':'clearance',
@@ -24,15 +20,14 @@ export default async function handler(req, res) {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       signal: AbortSignal.timeout(25000)
     });
-
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+
     const text = await response.text();
-    const lines = text.split('\n').filter(l => l.trim());
+    const lines = text.split('\n');
     const total = lines.length - 1;
 
     // Parse headers
-    const headers = lines[0].replace(/\r/g,'').split(',').map(h => h.replace(/^"|"$/g,'').trim());
-
+    const headers = lines[0].replace(/\r/g,'').split(',').map(h=>h.replace(/^"|"$/g,'').trim());
     const ci = {
       date:  headers.indexOf('score_date'),
       hub:   headers.indexOf('hub_name'),
@@ -47,13 +42,27 @@ export default async function handler(req, res) {
       rank:  headers.indexOf('szm_wise_day_rank'),
     };
 
-    const hubs = new Map();
+    // Pass 1: find the latest date (just read col 0 of each line quickly)
+    let latestDate = '';
+    for (let i = 1; i < lines.length; i++) {
+      const comma = lines[i].indexOf(',');
+      if (comma < 0) continue;
+      const d = lines[i].slice(0, comma).replace(/^"|"$/g,'').trim();
+      if (d && d > latestDate) latestDate = d;
+    }
 
+    // Pass 2: process only rows with latest date
+    const hubs = new Map();
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].replace(/\r/g,'');
       if (!line) continue;
 
-      // Parse CSV line handling quotes
+      // Quick date check before full parse
+      const comma = line.indexOf(',');
+      const lineDate = line.slice(0, comma).replace(/^"|"$/g,'').trim();
+      if (lineDate !== latestDate) continue;
+
+      // Full parse only for today's rows
       const vals = [];
       let cur = '', inQ = false;
       for (let j = 0; j < line.length; j++) {
@@ -82,11 +91,10 @@ export default async function handler(req, res) {
           n:get(ci.name),
           p:(pod&&!pod.includes('/')&&!pod.includes(':'))?pod:get(ci.zone),
           r:parseInt(get(ci.rank))||0,
-          d:get(ci.date),
+          d:latestDate,
           sc:0, m:{}
         });
       }
-
       const e = hubs.get(key);
       if (!e.m[mkey]) {
         e.m[mkey] = { s:parseFloat(get(ci.score))||0, p:parseInt(get(ci.cnt))||0 };
@@ -111,7 +119,7 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    res.status(200).json({ rows, total });
+    res.status(200).json({ rows, total, date: latestDate });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
