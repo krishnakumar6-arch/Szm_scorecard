@@ -24,25 +24,30 @@ export default async function handler(req, res) {
 
     const text = await response.text();
     const lines = text.split('\n');
-    const total = lines.length - 1;
 
     // Parse headers
+    // Columns: score_date(0), hub_name(1), system_szm_email(2), system_state_head_email(3),
+    // system_pod_head_email(4), Zone(5), POD(6), State Head(7), SZM(8),
+    // Score(9) = OVERALL HUB SCORE, Metric_Type(10), Priotity_type(11),
+    // achieved_value(12) = METRIC-SPECIFIC SCORE, weighted_score(13),
+    // counts(14), max_value(15), min_value(16), metric_weight(17), sub_category_weight(18)
     const headers = lines[0].replace(/\r/g,'').split(',').map(h=>h.replace(/^"|"$/g,'').trim());
     const ci = {
-      date:  headers.indexOf('score_date'),
-      hub:   headers.indexOf('hub_name'),
-      szm:   headers.indexOf('system_szm_email'),
-      zone:  headers.indexOf('Zone'),
-      pod:   headers.indexOf('POD'),
-      name:  headers.indexOf('SZM'),
-      score: headers.indexOf('Score'),
-      mtype: headers.indexOf('Metric_Type'),
-      wt:    headers.indexOf('weighted_score'),
-      cnt:   headers.indexOf('counts'),
-      rank:  headers.indexOf('szm_wise_day_rank'),
+      date:     headers.indexOf('score_date'),
+      hub:      headers.indexOf('hub_name'),
+      szm:      headers.indexOf('system_szm_email'),
+      zone:     headers.indexOf('Zone'),
+      pod:      headers.indexOf('POD'),
+      name:     headers.indexOf('SZM'),
+      hubScore: headers.indexOf('Score'),          // Overall hub score
+      mtype:    headers.indexOf('Metric_Type'),
+      achieved: headers.indexOf('achieved_value'), // Per-metric score
+      wt:       headers.indexOf('weighted_score'), // Contribution points
+      cnt:      headers.indexOf('counts'),         // Pending count
+      rank:     headers.indexOf('szm_wise_day_rank'),
     };
 
-    // Pass 1: find the latest date (just read col 0 of each line quickly)
+    // Pass 1: find latest date
     let latestDate = '';
     for (let i = 1; i < lines.length; i++) {
       const comma = lines[i].indexOf(',');
@@ -51,18 +56,19 @@ export default async function handler(req, res) {
       if (d && d > latestDate) latestDate = d;
     }
 
-    // Pass 2: process only rows with latest date
+    // Pass 2: process only latest date rows
     const hubs = new Map();
+
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].replace(/\r/g,'');
       if (!line) continue;
 
-      // Quick date check before full parse
+      // Quick date check
       const comma = line.indexOf(',');
       const lineDate = line.slice(0, comma).replace(/^"|"$/g,'').trim();
       if (lineDate !== latestDate) continue;
 
-      // Full parse only for today's rows
+      // Full CSV parse
       const vals = [];
       let cur = '', inQ = false;
       for (let j = 0; j < line.length; j++) {
@@ -72,7 +78,6 @@ export default async function handler(req, res) {
         else { cur += ch; }
       }
       vals.push(cur);
-
       const get = idx => idx >= 0 ? (vals[idx]||'').replace(/^"|"$/g,'').trim() : '';
 
       const szm = get(ci.szm);
@@ -87,26 +92,39 @@ export default async function handler(req, res) {
       if (!hubs.has(key)) {
         const pod = get(ci.pod);
         hubs.set(key, {
-          s:szm, h:hub,
-          n:get(ci.name),
-          p:(pod&&!pod.includes('/')&&!pod.includes(':'))?pod:get(ci.zone),
-          r:parseInt(get(ci.rank))||0,
-          d:latestDate,
-          sc:0, m:{}
+          s: szm, h: hub,
+          n: get(ci.name),
+          p: (pod && !pod.includes('/') && !pod.includes(':')) ? pod : get(ci.zone),
+          r: parseInt(get(ci.rank)) || 0,
+          d: latestDate,
+          hubScore: parseFloat(get(ci.hubScore)) || 0, // Overall hub score
+          m: {}
         });
       }
+
       const e = hubs.get(key);
       if (!e.m[mkey]) {
-        e.m[mkey] = { s:parseFloat(get(ci.score))||0, p:parseInt(get(ci.cnt))||0 };
-        e.sc += parseFloat(get(ci.wt))||0;
+        // achieved_value = metric-specific score (e.g. 87.18 for clearance)
+        // counts = pending shipments for this metric
+        // weighted_score = contribution to total (e.g. 5 pts)
+        e.m[mkey] = {
+          s: parseFloat(get(ci.achieved)) || 0,  // METRIC score
+          p: parseInt(get(ci.cnt)) || 0,          // Pending count
+          w: parseFloat(get(ci.wt)) || 0          // Weighted contribution
+        };
       }
     }
 
+    // Output: use hubScore as overall score (already computed in sheet)
+    // [szm(0), hub(1), hubScore(2), issue_s(3), issue_p(4), clear_s(5), clear_p(6),
+    //  d2za_s(7), d2za_p(8), fasr_s(9), fasr_p(10), tally_s(11), tally_p(12),
+    //  bag_s(13), bag_p(14), rank(15), pod(16), date(17), name(18)]
     const rows = [];
     for (const e of hubs.values()) {
-      const g = k => e.m[k]||{s:0,p:0};
+      const g = k => e.m[k] || { s: 0, p: 0 };
       rows.push([
-        e.s, e.h, +e.sc.toFixed(2),
+        e.s, e.h,
+        e.hubScore,
         g('issue').s,    g('issue').p,
         g('clearance').s,g('clearance').p,
         g('d2za').s,     g('d2za').p,
@@ -119,7 +137,7 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    res.status(200).json({ rows, total, date: latestDate });
+    res.status(200).json({ rows, total: lines.length - 1, date: latestDate });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
