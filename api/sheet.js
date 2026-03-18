@@ -79,8 +79,16 @@ export default async function handler(req, res) {
       const pend = parseInt(get('counts')) || 0;
       const wt = parseFloat(get('weighted_score')) || 0;
 
-      hubMap[key].m[mkey] = { s: sc, p: pend };
-      hubMap[key].score += wt;
+      const hub = hubMap[key];
+      if (!hub.m[mkey]) {
+        // First time seeing this metric for this hub
+        hub.m[mkey] = { s: sc, p: pend, wt: wt };
+        hub.score += wt;
+      } else {
+        // Same metric seen again (multiple sub-rows) — accumulate pending, keep highest score
+        hub.m[mkey].p += pend;
+        if (sc > hub.m[mkey].s) hub.m[mkey].s = sc;
+      }
     }
 
     // Convert to compact array format
