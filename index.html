@@ -102,6 +102,43 @@
       text-transform: uppercase;
     }
 
+    /* POD Filter */
+    .pod-filter-wrap {
+      padding: 8px 12px 4px;
+    }
+    .pod-filter-label {
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 0 4px 6px;
+    }
+    .pod-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding-bottom: 4px;
+    }
+    .pod-pill {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--navy3);
+      color: #94a3b8;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .pod-pill:hover { background: #475569; color: #e2e8f0; }
+    .pod-pill.active {
+      background: rgba(59,130,246,0.25);
+      color: #60a5fa;
+      border-color: rgba(59,130,246,0.4);
+    }
+
     .szm-list { padding: 0 12px 12px; }
 
     .szm-item {
@@ -712,7 +749,12 @@
     <div class="sidebar-date" id="sidebar-date">Loading...</div>
   </div>
 
-  <div class="szm-list-label">SZMs — Ranked by Score</div>
+  <div class="pod-filter-wrap">
+    <div class="pod-filter-label">Filter by POD</div>
+    <div class="pod-pills" id="pod-pills"></div>
+  </div>
+
+  <div class="szm-list-label" id="szm-list-label">SZMs — Ranked by Score</div>
   <div class="szm-list" id="szm-list"></div>
 </aside>
 
@@ -827,7 +869,7 @@
 // ═══════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/10NpUBBmzD_5zPJuCWIi3oMQB6hzzU8D7EC-zxesK2O8/edit?usp=sharing';
+const SHEET_URL = '/api/sheet';
 
 const METRICS = [
   { key: 'clearance', label: 'Hub Clearance',           scoreIdx: 5,  pendIdx: 6,  weight: 25, color: '#3b82f6', bg:'#eff6ff', icon: '🚚', desc: 'Attempted ÷ Eligible for attempt' },
@@ -850,6 +892,7 @@ let allData = [];
 let szmMap  = {};
 let szmRanks = {};
 let currentSZM = null;
+let currentPOD = 'ALL';
 let sortCol = 'score';
 let sortAsc = false;
 
@@ -899,19 +942,111 @@ function initials(name) {
 // ═══════════════════════════════════════════════════
 function parseCSV(csv) {
   const lines = csv.trim().split('\n');
-  const headers = lines[0].replace(/\r/g,'').split(',');
-  return lines.slice(1).map(line => {
-    const vals = line.replace(/\r/g,'').split(',');
+  const headers = lines[0].replace(/\r/g,'').split(',').map(h => h.trim().replace(/^"|"$/g,''));
+
+  // Parse each row into an object, handling quoted fields with commas
+  function splitCSVLine(line) {
+    const result = [];
+    let cur = '', inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQuote = !inQuote; }
+      else if (ch === ',' && !inQuote) { result.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const vals = splitCSVLine(line.replace(/\r/g,''));
     const o = {};
-    headers.forEach((h,i) => o[h.trim()] = (vals[i]||'').trim());
+    headers.forEach((h, i) => o[h] = (vals[i] || '').replace(/^"|"$/g, '').trim());
     return o;
   });
 }
 
+// Metric_Type values from your sheet mapped to internal keys
+const METRIC_TYPE_MAP = {
+  'Hub Clearance':           'clearance',
+  'Issue Raised Shipments':  'issue',
+  'FASR':                    'fasr',
+  'FPSR':                    'fasr',
+  'FASR & FPSR':             'fasr',
+  'D2+ ZA Pendency':         'd2za',
+  'D2ZA':                    'd2za',
+  'Bagging & Connection':    'bagging',
+  'Bagging Pendency':        'bagging',
+  'Shipment Tally':          'tally',
+  'Tally':                   'tally',
+};
+
+// Convert long-format sheet (one row per metric) into wide-format rows (one row per hub)
+// Output array index positions match what the rest of the app expects:
+// [0]=szm_email, [1]=hub_name, [2]=hub_score, [3]=issue_score, [4]=issue_pending,
+// [5]=clearance_score, [6]=clearance_pending, [7]=d2za_score, [8]=d2za_pending,
+// [9]=fasr_score, [10]=fasr_pending, [11]=tally_score, [12]=tally_pending,
+// [13]=bagging_score, [14]=bagging_pending, [15]=szm_rank, [16]=pod_name,
+// [17]=last_calc, [18]=score_date
+function parseAndPivotRows(rows) {
+  // Group rows by szm_email + hub_name
+  const hubMap = {};
+  rows.forEach(r => {
+    const key = (r.system_szm_email || '') + '||' + (r.hub_name || '');
+    if (!hubMap[key]) {
+      hubMap[key] = {
+        szm_email:  r.system_szm_email || '',
+        hub_name:   r.hub_name || '',
+        szm_name:   r.SZM || r.system_szm_email || '',
+        pod_name:   r.POD && !r.POD.includes('/') && !r.POD.includes(':') ? r.POD.trim() : (r.Zone || ''),
+        szm_rank:   parseInt(r.szm_wise_day_rank) || 0,
+        score_date: r.score_date || '',
+        last_calc:  r.score_date || '',
+        metrics:    {},
+        hub_score:  0,
+      };
+    }
+    const hub = hubMap[key];
+    const mtype = (r.Metric_Type || '').trim();
+    const mkey = METRIC_TYPE_MAP[mtype] || mtype.toLowerCase().replace(/\s+/g,'_');
+    const score = parseFloat(r.Score) || 0;
+    const pending = parseInt(r.counts) || 0;
+    const weighted = parseFloat(r.weighted_score) || 0;
+
+    hub.metrics[mkey] = { score, pending, weighted };
+    hub.hub_score += weighted;
+  });
+
+  return Object.values(hubMap).map(hub => {
+    const m = hub.metrics;
+    return [
+      hub.szm_email,                           // [0] szm_email
+      hub.hub_name,                            // [1] hub_name
+      parseFloat(hub.hub_score.toFixed(2)),    // [2] hub_score
+      (m.issue    || {}).score   || 0,         // [3] issue_score
+      (m.issue    || {}).pending || 0,         // [4] issue_pending
+      (m.clearance|| {}).score   || 0,         // [5] clearance_score
+      (m.clearance|| {}).pending || 0,         // [6] clearance_pending
+      (m.d2za     || {}).score   || 0,         // [7] d2za_score
+      (m.d2za     || {}).pending || 0,         // [8] d2za_pending
+      (m.fasr     || {}).score   || 0,         // [9] fasr_score
+      (m.fasr     || {}).pending || 0,         // [10] fasr_pending
+      (m.tally    || {}).score   || 0,         // [11] tally_score
+      (m.tally    || {}).pending || 0,         // [12] tally_pending
+      (m.bagging  || {}).score   || 0,         // [13] bagging_score
+      (m.bagging  || {}).pending || 0,         // [14] bagging_pending
+      hub.szm_rank,                            // [15] szm_rank
+      hub.pod_name,                            // [16] pod_name
+      hub.last_calc,                           // [17] last_calc
+      hub.score_date,                          // [18] score_date
+    ];
+  });
+}
+
+// Legacy function kept for EMBEDDED_DATA fallback compatibility
 function rowToArray(r) {
   return [
-    r.system_szm_email,
-    r.hub_name,
+    r.system_szm_email, r.hub_name,
     parseFloat(r.Hub_Score_Live)||0,
     parseFloat(r.Issue_Raised_Shipments_Score_out_of_100)||0,
     parseInt(r.Issue_Raised_Pending_Shipments_Count)||0,
@@ -926,9 +1061,7 @@ function rowToArray(r) {
     parseFloat(r.Bagging_Pendency_Score_out_of_100)||0,
     parseInt(r.Bagging_Pending_Shipments_Count)||0,
     parseInt(r['szm_wise_day_rank'])||0,
-    r.system_pod_name,
-    r.ist_last_calculated_at,
-    r.score_date,
+    r.system_pod_name, r.ist_last_calculated_at, r.score_date,
   ];
 }
 
@@ -960,16 +1093,70 @@ function computeSZMRanks(map) {
 // ═══════════════════════════════════════════════════
 // RENDER SIDEBAR
 // ═══════════════════════════════════════════════════
+function renderPODPills() {
+  // Collect all unique PODs from allData - filter out timestamps, empty, and non-POD values
+  const rawPods = allData.map(r => (r[16] || '').trim()).filter(p => {
+    if (!p) return false;
+    if (p.includes('/') || p.includes(':')) return false; // skip timestamps
+    if (p.includes('@')) return false; // skip emails
+    if (p.length > 30) return false; // skip long strings
+    return true;
+  });
+  const pods = ['ALL', ...new Set(rawPods)].sort((a,b) => a === 'ALL' ? -1 : b === 'ALL' ? 1 : a.localeCompare(b));
+
+  const pillsEl = document.getElementById('pod-pills');
+  pillsEl.innerHTML = '';
+  pods.forEach(pod => {
+    const btn = document.createElement('button');
+    btn.className = 'pod-pill' + (pod === currentPOD ? ' active' : '');
+    btn.textContent = pod === 'ALL' ? 'All PODs' : pod;
+    btn.addEventListener('click', () => {
+      currentPOD = pod;
+      renderPODPills();
+      renderSidebar();
+      // Auto-select first SZM of new POD
+      const filtered = getFilteredSZMMap();
+      const ranked = Object.entries(filtered).map(([szm, hubs]) => ({
+        szm, avg: hubs.reduce((s,h) => s+h[2],0)/hubs.length
+      })).sort((a,b) => b.avg - a.avg);
+      if (ranked.length > 0) selectSZM(ranked[0].szm);
+    });
+    pillsEl.appendChild(btn);
+  });
+}
+
+function getFilteredSZMMap() {
+  if (currentPOD === 'ALL') return szmMap;
+  const filtered = {};
+  Object.entries(szmMap).forEach(([szm, hubs]) => {
+    const podHubs = hubs.filter(h => (h[16] || '').trim() === currentPOD);
+    if (podHubs.length > 0) filtered[szm] = podHubs;
+  });
+  return filtered;
+}
+
 function renderSidebar() {
-  const szms = Object.keys(szmMap);
+  const filteredMap = getFilteredSZMMap();
+  const szms = Object.keys(filteredMap);
   const ranked = szms.map(szm => {
-    const hubs = szmMap[szm];
+    const hubs = filteredMap[szm];
     const avg = hubs.reduce((s,h) => s + h[2], 0) / hubs.length;
     return { szm, avg, hubs: hubs.length };
   }).sort((a,b) => b.avg - a.avg);
 
+  // Update label
+  const label = document.getElementById('szm-list-label');
+  if (label) label.textContent = currentPOD === 'ALL'
+    ? `SZMs — Ranked by Score (${ranked.length})`
+    : `${currentPOD} — ${ranked.length} SZMs`;
+
   const list = document.getElementById('szm-list');
   list.innerHTML = '';
+
+  if (ranked.length === 0) {
+    list.innerHTML = '<div style="color:#64748b;font-size:12px;padding:16px 16px;">No SZMs found for this POD</div>';
+    return;
+  }
 
   ranked.forEach((item, i) => {
     const name = nameFromEmail(item.szm);
@@ -1187,7 +1374,8 @@ async function loadData() {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const csv = await resp.text();
     const parsed = parseCSV(csv);
-    allData = parsed.map(rowToArray);
+    // Use pivot function for new long-format sheet (one row per metric)
+    allData = parseAndPivotRows(parsed);
   } catch(e) {
     console.warn('Fetch failed, using embedded data:', e.message);
     allData = EMBEDDED_DATA;
@@ -1199,6 +1387,8 @@ async function loadData() {
   const scoreDate = allData[0]?.[18] || 'Today';
   document.getElementById('sidebar-date').textContent = 'Score Date: ' + scoreDate;
 
+  currentPOD = 'ALL';
+  renderPODPills();
   renderSidebar();
 
   // Auto-select first (highest-ranked) SZM
