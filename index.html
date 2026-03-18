@@ -893,6 +893,7 @@ let szmMap  = {};
 let szmRanks = {};
 let currentSZM = null;
 let currentPOD = 'ALL';
+let szmNames = {};
 let sortCol = 'score';
 let sortAsc = false;
 
@@ -926,6 +927,7 @@ function ringColor(v) {
 }
 function fmt(v) { return (parseFloat(v)||0).toFixed(1); }
 function nameFromEmail(email) {
+  if (szmNames[email]) return szmNames[email];
   const local = email.split('@')[0];
   return local.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 }
@@ -968,17 +970,21 @@ function parseCSV(csv) {
 
 // Metric_Type values from your sheet mapped to internal keys
 const METRIC_TYPE_MAP = {
-  'Hub Clearance':           'clearance',
-  'Issue Raised Shipments':  'issue',
-  'FASR':                    'fasr',
-  'FPSR':                    'fasr',
-  'FASR & FPSR':             'fasr',
-  'D2+ ZA Pendency':         'd2za',
-  'D2ZA':                    'd2za',
-  'Bagging & Connection':    'bagging',
-  'Bagging Pendency':        'bagging',
-  'Shipment Tally':          'tally',
-  'Tally':                   'tally',
+  // Exact Metric_Type values from your Google Sheet
+  'Clearance':                    'clearance',
+  'Issue Raised Shipments Score': 'issue',
+  'FASR':                         'fasr',
+  'FPSR':                         'fasr',
+  'D2ZA':                         'd2za',
+  'Bagging Pendency':             'bagging',
+  'Tally':                        'tally',
+  // Legacy fallbacks
+  'Hub Clearance':                'clearance',
+  'Issue Raised Shipments':       'issue',
+  'FASR & FPSR':                  'fasr',
+  'D2+ ZA Pendency':              'd2za',
+  'Bagging & Connection':         'bagging',
+  'Shipment Tally':               'tally',
 };
 
 // Convert long-format sheet (one row per metric) into wide-format rows (one row per hub)
@@ -997,10 +1003,10 @@ function parseAndPivotRows(rows) {
       hubMap[key] = {
         szm_email:  r.system_szm_email || '',
         hub_name:   r.hub_name || '',
-        szm_name:   r.SZM || r.system_szm_email || '',
+        szm_name:   (r.SZM || '').trim() || r.system_szm_email || '',
         pod_name:   r.POD && !r.POD.includes('/') && !r.POD.includes(':') ? r.POD.trim() : (r.Zone || ''),
         szm_rank:   parseInt(r.szm_wise_day_rank) || 0,
-        score_date: r.score_date || '',
+        score_date: (r.score_date || '').trim(),
         last_calc:  r.score_date || '',
         metrics:    {},
         hub_score:  0,
@@ -1039,6 +1045,7 @@ function parseAndPivotRows(rows) {
       hub.pod_name,                            // [16] pod_name
       hub.last_calc,                           // [17] last_calc
       hub.score_date,                          // [18] score_date
+      hub.szm_name,                            // [19] real SZM name
     ];
   });
 }
@@ -1074,6 +1081,8 @@ function buildSZMMap(rows) {
     const szm = r[0];
     if (!map[szm]) map[szm] = [];
     map[szm].push(r);
+    // Store real name from sheet (index 19) if available
+    if (r[19] && !szmNames[szm]) szmNames[szm] = r[19];
   });
   return map;
 }
@@ -1387,6 +1396,7 @@ async function loadData() {
   const scoreDate = allData[0]?.[18] || 'Today';
   document.getElementById('sidebar-date').textContent = 'Score Date: ' + scoreDate;
 
+  szmNames = {};
   currentPOD = 'ALL';
   renderPODPills();
   renderSidebar();
