@@ -4,7 +4,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   const SHEET_ID = '1WV7v2CeS7RQHWCETpEF1SIVugrlrJf29XCYvcVvDZAI';
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+
+  // Use Google Sheets gviz query to fetch only latest date's data
+  // This dramatically reduces rows from 123k to ~2k
+  const query = encodeURIComponent("select * where A=max(A)");
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&tq=${query}`;
 
   const METRIC_MAP = {
     'Clearance':'clearance','Hub Clearance':'clearance',
@@ -20,40 +24,47 @@ export default async function handler(req, res) {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       signal: AbortSignal.timeout(25000)
     });
-    if (!response.ok) throw new Error(`Google returned ${response.status}`);
 
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
     const text = await response.text();
-    const lines = text.split('\n');
+    const lines = text.split('\n').filter(l => l.trim());
     const total = lines.length - 1;
 
-    // Parse header
-    const rawHdr = lines[0].replace(/\r/g,'');
-    const headers = rawHdr.split(',').map(h => h.replace(/^"|"$/g,'').trim());
+    // Parse headers
+    const headers = lines[0].replace(/\r/g,'').split(',').map(h => h.replace(/^"|"$/g,'').trim());
 
     const ci = {
-      date:   headers.indexOf('score_date'),
-      hub:    headers.indexOf('hub_name'),
-      szm:    headers.indexOf('system_szm_email'),
-      zone:   headers.indexOf('Zone'),
-      pod:    headers.indexOf('POD'),
-      name:   headers.indexOf('SZM'),
-      score:  headers.indexOf('Score'),
-      mtype:  headers.indexOf('Metric_Type'),
-      wt:     headers.indexOf('weighted_score'),
-      cnt:    headers.indexOf('counts'),
-      rank:   headers.indexOf('szm_wise_day_rank'),
+      date:  headers.indexOf('score_date'),
+      hub:   headers.indexOf('hub_name'),
+      szm:   headers.indexOf('system_szm_email'),
+      zone:  headers.indexOf('Zone'),
+      pod:   headers.indexOf('POD'),
+      name:  headers.indexOf('SZM'),
+      score: headers.indexOf('Score'),
+      mtype: headers.indexOf('Metric_Type'),
+      wt:    headers.indexOf('weighted_score'),
+      cnt:   headers.indexOf('counts'),
+      rank:  headers.indexOf('szm_wise_day_rank'),
     };
 
-    // Compact hub map - use Map for memory efficiency
     const hubs = new Map();
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].replace(/\r/g,'');
       if (!line) continue;
 
-      // Fast split without regex
-      const vals = line.split(',');
-      const get = (idx) => idx >= 0 ? (vals[idx]||'').replace(/^"|"$/g,'').trim() : '';
+      // Parse CSV line handling quotes
+      const vals = [];
+      let cur = '', inQ = false;
+      for (let j = 0; j < line.length; j++) {
+        const ch = line[j];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { vals.push(cur); cur = ''; }
+        else { cur += ch; }
+      }
+      vals.push(cur);
+
+      const get = idx => idx >= 0 ? (vals[idx]||'').replace(/^"|"$/g,'').trim() : '';
 
       const szm = get(ci.szm);
       const hub = get(ci.hub);
@@ -63,40 +74,31 @@ export default async function handler(req, res) {
       const mkey = METRIC_MAP[mtype];
       if (!mkey) continue;
 
-      const key = szm + '\x00' + hub;
-
+      const key = szm + '|' + hub;
       if (!hubs.has(key)) {
         const pod = get(ci.pod);
         hubs.set(key, {
-          s: szm, h: hub,
-          n: get(ci.name),
-          p: (pod && !pod.includes('/') && !pod.includes(':')) ? pod : get(ci.zone),
-          r: parseInt(get(ci.rank))||0,
-          d: get(ci.date),
-          sc: 0,
-          m: {}
+          s:szm, h:hub,
+          n:get(ci.name),
+          p:(pod&&!pod.includes('/')&&!pod.includes(':'))?pod:get(ci.zone),
+          r:parseInt(get(ci.rank))||0,
+          d:get(ci.date),
+          sc:0, m:{}
         });
       }
 
-      const entry = hubs.get(key);
-      if (!entry.m[mkey]) {
-        const wt = parseFloat(get(ci.wt))||0;
-        entry.m[mkey] = {
-          s: parseFloat(get(ci.score))||0,
-          p: parseInt(get(ci.cnt))||0
-        };
-        entry.sc += wt;
+      const e = hubs.get(key);
+      if (!e.m[mkey]) {
+        e.m[mkey] = { s:parseFloat(get(ci.score))||0, p:parseInt(get(ci.cnt))||0 };
+        e.sc += parseFloat(get(ci.wt))||0;
       }
     }
 
-    // Convert to compact arrays
     const rows = [];
     for (const e of hubs.values()) {
-      const m = e.m;
-      const g = k => m[k] || {s:0,p:0};
+      const g = k => e.m[k]||{s:0,p:0};
       rows.push([
-        e.s, e.h,
-        +e.sc.toFixed(2),
+        e.s, e.h, +e.sc.toFixed(2),
         g('issue').s,    g('issue').p,
         g('clearance').s,g('clearance').p,
         g('d2za').s,     g('d2za').p,
