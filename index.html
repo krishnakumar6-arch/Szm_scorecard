@@ -974,20 +974,21 @@ function doRefresh(){
 // ═══════════════════════════════════════
 async function loadData(){
   const sub=document.getElementById('loading-sub');
-  if(sub) sub.textContent='Fetching 100k+ rows...';
+  if(sub) sub.textContent='Connecting to data source...';
   try{
     const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),30000); // 30s timeout for large data
+    const timer=setTimeout(()=>controller.abort(),30000);
     const resp=await fetch(SHEET_URL,{signal:controller.signal});
     clearTimeout(timer);
     if(!resp.ok) throw new Error('HTTP '+resp.status);
-    if(sub) sub.textContent='Processing data...';
-    const csv=await resp.text();
-    const parsed=parseCSV(csv);
-    if(sub) sub.textContent='Building scorecard...';
-    allData=pivotRows(parsed);
+    if(sub) sub.textContent='Processing scorecard data...';
+    const json=await resp.json();
+    if(json.error) throw new Error(json.error);
+    if(sub) sub.textContent=`Loaded ${json.rows.length} hubs from ${json.total} records`;
+    allData=json.rows;
   }catch(e){
     console.warn('Fetch failed:',e.message);
+    if(sub) sub.textContent='Using cached data';
     allData=FALLBACK_DATA;
   }
 
