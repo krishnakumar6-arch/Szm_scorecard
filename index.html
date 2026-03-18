@@ -561,7 +561,7 @@ async function loadData(){
   szmNames={};
   szmMap=buildMap(allData);
   szmRanks=buildRanks(szmMap);
-  const d=allData[0]?.[16]||'';
+  const d=allData[0]?.[17]||'';
   document.getElementById('sidebar-date').textContent=d?'Score Date: '+d:'Live';
   curPOD='ALL';
   renderPODs();renderSidebar();
@@ -585,7 +585,7 @@ function buildRanks(m){
 
 // ═══ PODs ═══
 function renderPODs(){
-  const raw=allData.map(r=>(r[15]||'').trim()).filter(p=>p&&!p.includes('/')&&!p.includes(':')&&!p.includes('@')&&p.length<30);
+  const raw=allData.map(r=>(r[16]||'').trim()).filter(p=>p&&!p.includes('/')&&!p.includes(':')&&!p.includes('@')&&p.length<30);
   const pods=['ALL',...new Set(raw)].sort((a,b)=>a==='ALL'?-1:b==='ALL'?1:a.localeCompare(b));
   const el=document.getElementById('pod-pills');el.innerHTML='';
   pods.forEach(pod=>{
@@ -598,7 +598,7 @@ function renderPODs(){
 }
 function filteredMap(){
   if(curPOD==='ALL')return szmMap;
-  const f={};Object.entries(szmMap).forEach(([s,h])=>{const p=h.filter(x=>(x[15]||'').trim()===curPOD);if(p.length>0)f[s]=p;});return f;
+  const f={};Object.entries(szmMap).forEach(([s,h])=>{const p=h.filter(x=>(x[16]||'').trim()===curPOD);if(p.length>0)f[s]=p;});return f;
 }
 
 // ═══ SIDEBAR ═══
@@ -647,12 +647,12 @@ function renderDash(szm){
   const worst=Math.min(...hubs.map(h=>h[2]));
   const mAvgs=METRICS.map(m=>({...m,avg:hubs.reduce((s,h)=>s+h[m.si],0)/hubs.length,pend:hubs.reduce((s,h)=>s+h[m.pi],0)}));
   const totPend=mAvgs.reduce((s,m)=>s+m.pend,0);
-  const scoreDate=hubs[0]?.[16]||'';
-  const lastCalc=hubs[0]?.[16]||'';
+  const scoreDate=hubs[0]?.[17]||'';
+  const lastCalc=hubs[0]?.[17]||'';
 
   // Topbar
   document.getElementById('topbar-name').innerHTML=`${n}'s <span>Scorecard</span>`;
-  document.getElementById('topbar-sub').textContent=`${hubs.length} hubs · ${hubs[0]?.[15]||''} · ${scoreDate}`;
+  document.getElementById('topbar-sub').textContent=`${hubs.length} hubs · ${hubs[0]?.[16]||''} · ${scoreDate}`;
   document.getElementById('date-badge').textContent='Updated: '+lastCalc;
 
   // Hero
@@ -799,7 +799,7 @@ function doRefresh(){
 
 // ═══ FALLBACK ═══
 const FALLBACK=[
-  ["madesh.n@shadowfax.in","BLR_JPNagar",68.2,91,1,100,116,100,0,0,1067,0,46,100,0,9,"POD_BLR","3/11/2026","Madesh N"],
+  ["madesh.n@shadowfax.in","BLR_JPNagar",68.2,91,1,100,116,100,0,0,1067,0,46,100,0,4,"POD_BLR","3/11/2026","Madesh N"],
   ["madesh.n@shadowfax.in","BLR_ElectronicCity",73.14,100,0,100,75,100,0,0,783,0,62,75,4,1,"POD_BLR","3/11/2026","Madesh N"],
 ];
 
