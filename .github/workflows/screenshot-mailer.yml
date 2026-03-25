@@ -19,6 +19,17 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Debug secrets (safe - shows length only)
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+        run: |
+          echo "RESEND_API_KEY length: ${#RESEND_API_KEY}"
+          echo "TO_EMAIL length: ${#TO_EMAIL}"
+          if [ -z "$RESEND_API_KEY" ]; then echo "ERROR: RESEND_API_KEY is empty"; exit 1; fi
+          if [ -z "$TO_EMAIL" ]; then echo "ERROR: TO_EMAIL is empty"; exit 1; fi
+          echo "Both secrets confirmed present"
+
       - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
 
