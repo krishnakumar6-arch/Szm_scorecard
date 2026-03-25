@@ -19,9 +19,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: npm install
-
       - name: Install Chrome dependencies
         run: |
           sudo apt-get update
@@ -30,10 +27,13 @@ jobs:
             libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
             libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
 
+      - name: Install Node dependencies
+        run: npm install
+
       - name: Take screenshot and send email
         env:
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
           SITE_URL: https://szm-scorecard-krishnakumar6-archs-projects.vercel.app
         run: node screenshot-mailer.js
