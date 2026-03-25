@@ -2,7 +2,7 @@
   "name": "szm-screenshot-mailer",
   "version": "1.0.0",
   "dependencies": {
-    "puppeteer": "^22.0.0",
+    "puppeteer-core": "^22.0.0",
     "resend": "^3.0.0"
   }
 }
