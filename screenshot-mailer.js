@@ -8,10 +8,17 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const TO_EMAIL = process.env.TO_EMAIL;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 
-if (!RESEND_API_KEY) { console.error('ERROR: RESEND_API_KEY missing'); process.exit(1); }
-if (!TO_EMAIL) { console.error('ERROR: TO_EMAIL missing'); process.exit(1); }
+// Print all env vars (masked) for debugging
+console.log('=== Config Check ===');
+console.log('SITE_URL:', SITE_URL || 'MISSING');
+console.log('RESEND_API_KEY:', RESEND_API_KEY ? `set (${RESEND_API_KEY.substring(0,8)}...)` : 'MISSING');
+console.log('TO_EMAIL:', TO_EMAIL || 'MISSING');
+console.log('FROM_EMAIL:', FROM_EMAIL);
+console.log('===================');
 
-// Find Chrome on the system
+if (!RESEND_API_KEY) { console.error('FATAL: RESEND_API_KEY missing'); process.exit(1); }
+if (!TO_EMAIL) { console.error('FATAL: TO_EMAIL missing'); process.exit(1); }
+
 function findChrome() {
   const paths = [
     '/usr/bin/google-chrome',
@@ -21,44 +28,45 @@ function findChrome() {
     '/snap/bin/chromium'
   ];
   for (const p of paths) {
-    try { execSync(`test -f ${p}`); return p; } catch (_) {}
+    try {
+      execSync(`test -f "${p}"`);
+      console.log('Found Chrome at:', p);
+      return p;
+    } catch (_) {}
   }
-  throw new Error('Chrome not found. Checked: ' + paths.join(', '));
+  // Try which command
+  try {
+    const path = execSync('which google-chrome || which chromium-browser || which chromium').toString().trim();
+    if (path) { console.log('Found Chrome via which:', path); return path; }
+  } catch (_) {}
+  throw new Error('Chrome not found on system');
 }
 
 async function takeScreenshot() {
   const chromePath = findChrome();
-  console.log(`Using Chrome at: ${chromePath}`);
 
   const browser = await puppeteer.launch({
     executablePath: chromePath,
     headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--window-size=1440,900'
-    ]
+    args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu']
   });
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
 
-  console.log(`Opening ${SITE_URL}...`);
+  console.log('Navigating to:', SITE_URL);
   await page.goto(SITE_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-  console.log('Waiting for content to render...');
   try {
     await page.waitForSelector('table, canvas, #root > *', { timeout: 30000 });
-  } catch (e) {
-    console.log('Selector wait timed out, continuing...');
-  }
+  } catch (e) { console.log('Selector wait timed out'); }
+
   await new Promise(r => setTimeout(r, 5000));
 
   const screenshotPath = '/tmp/szm-scorecard.png';
   await page.screenshot({ path: screenshotPath, fullPage: true });
-  console.log('Screenshot saved.');
+  const size = fs.statSync(screenshotPath).size;
+  console.log(`Screenshot saved: ${screenshotPath} (${Math.round(size/1024)}KB)`);
   await browser.close();
   return screenshotPath;
 }
@@ -68,9 +76,8 @@ async function sendEmail(screenshotPath) {
   const resend = new Resend(RESEND_API_KEY);
 
   const now = new Date().toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    weekday: 'short', day: '2-digit', month: 'short',
-    year: 'numeric', hour: '2-digit', minute: '2-digit'
+    timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit',
+    month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
   const imageData = fs.readFileSync(screenshotPath).toString('base64');
@@ -96,17 +103,22 @@ async function sendEmail(screenshotPath) {
     attachments: [{ filename: 'szm-scorecard.png', content: imageData }]
   });
 
-  if (error) { console.error('Resend error:', JSON.stringify(error)); throw new Error(error.message); }
-  console.log(`Email sent! ID: ${data.id}`);
+  if (error) {
+    console.error('Resend API error:', JSON.stringify(error, null, 2));
+    throw new Error(`Resend failed: ${error.message}`);
+  }
+
+  console.log('Email sent! ID:', data.id);
 }
 
 (async () => {
   try {
     const path = await takeScreenshot();
     await sendEmail(path);
-    console.log('Done!');
+    console.log('All done!');
   } catch (e) {
-    console.error('Failed:', e.message);
+    console.error('FAILED:', e.message);
+    console.error(e.stack);
     process.exit(1);
   }
 })();
